@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="ESP32 LED Matrix WebSerial Controller">
+    <meta name="author" content="Elouan Grimm">
+    
+    <title>Matrix Controller</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231c1917'/><rect x='25' y='25' width='50' height='50' fill='%233b82f6'/></svg>">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Matrix Controller</h1>
+            <div class="status-group">
+                <span id="statusBadge" class="badge">Disconnected</span>
+                <button id="btnConnect" class="btn-primary">Connect</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <div class="canvas-container">
+            <canvas id="matrixCanvas" width="512" height="512"></canvas>
+            
+            <div class="canvas-tools">
+                <div class="color-picker-wrapper">
+                    <label for="colorPicker">Brush:</label>
+                    <input type="color" id="colorPicker" value="#ef4444">
+                </div>
+            </div>
+        </div>
+        
+        <aside class="sidebar">
+            <section class="panel">
+                <h2>Controls</h2>
+                <div class="btn-group">
+                    <label class="btn">
+                        Import Image
+                        <input type="file" id="imageInput" accept="image/*">
+                    </label>
+                    <button id="btnClear" class="btn">Clear Matrix</button>
+                    <button id="btnTest" class="btn">Send Test Pattern</button>
+                </div>
+                
+                <div class="toggles">
+                    <label class="toggle">
+                        <input type="checkbox" id="chkFlipX">
+                        <span class="toggle-label">Flip Horizontal</span>
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="chkFlipY">
+                        <span class="toggle-label">Flip Vertical</span>
+                    </label>
+                </div>
+            </section>
+            
+            <section class="panel console-panel">
+                <h2>Serial Log</h2>
+                <div class="log-window" id="logWindow"></div>
+                <button id="btnClearLog" class="btn-small">Clear Log</button>
+            </section>
+        </aside>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

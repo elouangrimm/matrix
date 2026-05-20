@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>ESP32 LED Matrix Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="layout">
+        <!-- Top Navigation -->
+        <header class="topbar">
+            <div class="title-group">
+                <i class="fa-solid fa-microchip"></i>
+                <h1 data-i18n="title">Matrix Controller</h1>
+            </div>
+            <div class="header-actions">
+                <select id="langSelect" class="lang-select">
+                    <option value="en">EN</option>
+                    <option value="fr">FR</option>
+                </select>
+                <button id="btnAbout" class="icon-btn" title="About"><i class="fa-solid fa-circle-question"></i></button>
+            </div>
+            <div class="connection-group">
+                <div class="status-indicator">
+                    <span id="statusDot" class="dot disconnected"></span>
+                    <span id="statusText" data-i18n="disconnected">Disconnected</span>
+                </div>
+                <button id="btnConnect" class="btn btn-primary">
+                    <i class="fa-solid fa-plug"></i> <span data-i18n="connect">Connect</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Left Sidebar - Tools -->
+            <aside class="sidebar left-sidebar">
+                <div class="panel">
+                    <h3><i class="fa-solid fa-pen-nib"></i> <span data-i18n="tools">Drawing Tools</span></h3>
+
+                    
+                    <div class="tool-grid">
+                        <button class="tool-btn active" id="btnToolDraw" title="Draw">
+                            <i class="fa-solid fa-paintbrush"></i>
+                        </button>
+                        <button class="tool-btn" id="btnToolFill" title="Bucket Fill">
+                            <i class="fa-solid fa-fill-drip"></i>
+                        </button>
+                        <button class="tool-btn" id="btnToolErase" title="Erase">
+                            <i class="fa-solid fa-eraser"></i>
+                        </button>
+                    </div>
+
+                    <div class="color-section">
+                        <label>Color</label>
+                        <div class="color-picker-container">
+                            <input type="color" id="colorPicker" value="#3b82f6">
+                            <div class="quick-colors" id="quickColors">
+                                <button class="c-swatch" style="background-color: #ef4444;" data-c="#ef4444"></button>
+                                <button class="c-swatch" style="background-color: #22c55e;" data-c="#22c55e"></button>
+                                <button class="c-swatch" style="background-color: #3b82f6;" data-c="#3b82f6"></button>
+                                <button class="c-swatch" style="background-color: #f59e0b;" data-c="#f59e0b"></button>
+                                <button class="c-swatch" style="background-color: #a855f7;" data-c="#a855f7"></button>
+                                <button class="c-swatch" style="background-color: #ec4899;" data-c="#ec4899"></button>
+                                <button class="c-swatch" style="background-color: #ffffff;" data-c="#ffffff"></button>
+                                <button class="c-swatch" style="background-color: #000000; box-shadow: inset 0 0 0 1px #444;" data-c="#000000"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3><i class="fa-solid fa-images"></i> <span data-i18n="examples">Examples</span></h3>
+                    <div class="example-grid">
+                        <img class="example-img" src="example1.png" alt="Example 1" title="Example 1" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\'%3E%3Crect width=\'16\' height=\'16\' fill=\'%23333\'/%3E%3C/svg%3E'">
+                        <img class="example-img" src="example2.png" alt="Example 2" title="Example 2" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\'%3E%3Crect width=\'16\' height=\'16\' fill=\'%23333\'/%3E%3C/svg%3E'">
+                        <img class="example-img" src="example3.png" alt="Example 3" title="Example 3" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\'%3E%3Crect width=\'16\' height=\'16\' fill=\'%23333\'/%3E%3C/svg%3E'">
+                    </div>
+                </div>
+
+                <div id="golControls" class="panel hidden" style="border-color: #f59e0b;">
+                    <h3 style="color: #f59e0b;"><i class="fa-solid fa-gamepad"></i> Game of Life</h3>
+                    <div class="modifiers">
+                        <button id="btnGolPlay" class="btn btn-secondary action-btn" style="justify-content: center; width: 100%;">
+                            <i class="fa-solid fa-play"></i> Play/Pause
+                        </button>
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; display: block;">Speed</label>
+                        <input type="range" id="golSpeed" min="1" max="100" value="80" style="width:100%">
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3><i class="fa-solid fa-image"></i> <span data-i18n="util">Utilities</span></h3>
+                    <div class="action-list">
+                        <label class="btn btn-secondary action-btn">
+                            <i class="fa-solid fa-file-import"></i> <span data-i18n="import">Import Image</span>
+                            <input type="file" id="imageInput" accept="image/*">
+                        </label>
+                        <button id="btnClear" class="btn btn-secondary action-btn">
+                            <i class="fa-solid fa-trash-can"></i> <span data-i18n="clear">Clear Matrix</span>
+                        </button>
+                        <button id="btnTest" class="btn btn-secondary action-btn">
+                            <i class="fa-solid fa-vial"></i> <span data-i18n="test">Test Pattern</span>
+                        </button>
+                    </div>
+                    
+                    <!--
+                    <div class="modifiers">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="chkFlipX">
+                            <span class="slider"></span>
+                            <span class="label" data-i18n="flipx">Flip X</span>
+                        </label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="chkFlipY">
+                            <span class="slider"></span>
+                            <span class="label" data-i18n="flipy">Flip Y</span>
+                        </label>
+                    </div>
+                    -->
+                </div>
+            </aside>
+
+            <!-- Center - Canvas -->
+            <main class="canvas-area">
+                <div class="canvas-wrapper">
+                    <canvas id="matrixCanvas" width="512" height="512"></canvas>
+                </div>
+            </main>
+
+            <!-- Right Sidebar - Console -->
+            <aside class="sidebar right-sidebar">
+                <div class="panel console-panel">
+                    <div class="console-header">
+                        <h3><i class="fa-solid fa-terminal"></i> <span data-i18n="logs">Terminal Logs</span></h3>
+                        <button id="btnClearLog" class="icon-btn" title="Clear Logs">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                    <div class="log-container" id="logWindow"></div>
+                </div>
+            </aside>
+        </div>
+    </div>
+    
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal hidden">
+        <div class="modal-content">
+            <button id="btnCloseModal" class="icon-btn close-modal"><i class="fa-solid fa-xmark"></i></button>
+            <div class="modal-header-img">
+                <!-- Circuit Diagram Placeholder (SVG) -->
+                <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 150'><rect width='100%' height='100%' fill='%23111'/><text x='50%' y='50%' fill='%23666' font-family='sans-serif' font-size='20' text-anchor='middle' alignment-baseline='middle'>[ Schéma du circuit ESP32 + Neopixel ]</text></svg>" alt="Circuit diagram">
+            </div>
+            <h2>À propos de ce contrôleur</h2>
+            <p>Ce tableau de bord permet de contrôler une matrice LED 16x16 alimentée par un ESP32 via WebSerial. Le flux de données est géré sans blocage grâce à une synchronisation Mutex stricte pour éviter la corruption en mémoire.</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
