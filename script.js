@@ -48,7 +48,9 @@ const i18n = {
         'examples': 'Examples',
         'util': 'Utilities',
         'import': 'Import Image',
+        'export': 'Export Image',
         'clear': 'Clear Matrix',
+        'upload': 'Upload to ESP32',
         'test': 'Test Pattern',
         'flipx': 'Flip X',
         'flipy': 'Flip Y',
@@ -69,7 +71,9 @@ const i18n = {
         'examples': 'Exemples',
         'util': 'Utilitaires',
         'import': 'Importer Image',
+        'export': 'Exporter Image',
         'clear': 'Tout effacer',
+        'upload': 'Téléverser vers ESP32',
         'test': 'Motif Test',
         'flipx': 'Miroir X',
         'flipy': 'Miroir Y',
@@ -419,14 +423,54 @@ document.getElementById('btnTest').addEventListener('click', () => {
     sendTextCommand("TEST\n");
 });
 
+document.getElementById('btnExport').addEventListener('click', () => {
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = GRID_SIZE;
+    exportCanvas.height = GRID_SIZE;
+    const eCtx = exportCanvas.getContext('2d');
+    const imgData = eCtx.createImageData(GRID_SIZE, GRID_SIZE);
+    let i = 0;
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+            imgData.data[i++] = grid[y][x].r;
+            imgData.data[i++] = grid[y][x].g;
+            imgData.data[i++] = grid[y][x].b;
+            imgData.data[i++] = 255;
+        }
+    }
+    eCtx.putImageData(imgData, 0, 0);
+    const link = document.createElement('a');
+    link.download = 'matrix_export.png';
+    link.href = exportCanvas.toDataURL();
+    link.click();
+});
+
+document.getElementById('btnUpload').addEventListener('click', () => {
+    // If an animation is running, upload the animation command
+    if (currentAnimationName) {
+        let speed = document.getElementById('animSpeed').value;
+        let brightness = document.getElementById('globalBrightness').value;
+        sendTextCommand("SAVEANIM " + currentAnimationName + " " + speed + " " + brightness + "\n");
+        return;
+    }
+    // Otherwise, upload the current grid as the saved state
+    sendTextCommand("SAVEFRAME\n");
+    // Wait a tiny bit then send current frame so the board stores it
+    setTimeout(() => {
+        sendCurrentFrame();
+    }, 100);
+});
+
 // Animations
 let currentAnimation = null;
+let currentAnimationName = "";
 let animPhase = 0;
 
 function stopAnimation() {
     if (currentAnimation) {
         clearInterval(currentAnimation);
         currentAnimation = null;
+        currentAnimationName = "";
     }
 }
 
@@ -440,6 +484,7 @@ document.getElementById('btnAnimStop').addEventListener('click', () => {
 
 document.getElementById('btnAnimRainbow').addEventListener('click', () => {
     stopAnimation();
+    currentAnimationName = "rainbow";
     animPhase = 0;
     currentAnimation = setInterval(() => {
         let speed = 0.5 * parseFloat(document.getElementById('animSpeed').value);
@@ -458,6 +503,7 @@ document.getElementById('btnAnimRainbow').addEventListener('click', () => {
 
 document.getElementById('btnAnimRipple').addEventListener('click', () => {
     stopAnimation();
+    currentAnimationName = "ripple";
     animPhase = 0;
     currentAnimation = setInterval(() => {
         let speed = 0.5 * parseFloat(document.getElementById('animSpeed').value);
@@ -478,6 +524,7 @@ document.getElementById('btnAnimRipple').addEventListener('click', () => {
 
 document.getElementById('btnAnimMatrix').addEventListener('click', () => {
     stopAnimation();
+    currentAnimationName = "matrix";
     // Initialize empty grid with some random drops
     let drops = Array.from({length: GRID_SIZE}, () => (Math.random() * -GRID_SIZE));
     
