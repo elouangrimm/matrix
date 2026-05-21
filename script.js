@@ -38,6 +38,7 @@ const i18n = {
         'connect': 'Connect',
         'disconnect': 'Disconnect',
         'disconnected': 'Disconnected',
+        'animations': 'Animations',
         'tools': 'Drawing Tools',
         'examples': 'Examples',
         'util': 'Utilities',
@@ -53,6 +54,7 @@ const i18n = {
         'connect': 'Connecter',
         'disconnect': 'Déconnecter',
         'disconnected': 'Déconnecté',
+        'animations': 'Animations',
         'tools': 'Outils de dessin',
         'examples': 'Exemples',
         'util': 'Utilitaires',
@@ -316,6 +318,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
 
 canvas.addEventListener('mousedown', (e) => { 
+    stopAnimation();
     isDrawingMouse = true; 
     interactCanvas(e); 
 });
@@ -344,14 +347,122 @@ document.getElementById('imageInput').addEventListener('change', (e) => {
 
 // Action Buttons
 document.getElementById('btnClear').addEventListener('click', () => {
+    stopAnimation();
     grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill({ r: 0, g: 0, b: 0 }));
     drawGrid();
     sendTextCommand("CLEAR\n");
 });
 
 document.getElementById('btnTest').addEventListener('click', () => {
+    stopAnimation();
     sendTextCommand("TEST\n");
 });
+
+// Animations
+let currentAnimation = null;
+let animPhase = 0;
+
+function stopAnimation() {
+    if (currentAnimation) {
+        clearInterval(currentAnimation);
+        currentAnimation = null;
+    }
+}
+
+document.getElementById('btnAnimStop').addEventListener('click', () => {
+    stopAnimation();
+    grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill({ r: 0, g: 0, b: 0 }));
+    drawGrid();
+    requestFrameSend();
+});
+
+document.getElementById('btnAnimRainbow').addEventListener('click', () => {
+    stopAnimation();
+    animPhase = 0;
+    currentAnimation = setInterval(() => {
+        animPhase -= 0.5; // speed
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                const hue = ((x + y) * 10 + animPhase * 10) % 360;
+                const rgb = hslToRgb(hue < 0 ? hue + 360 : hue, 1, 0.5);
+                grid[y][x] = { r: rgb[0], g: rgb[1], b: rgb[2] };
+            }
+        }
+        drawGrid();
+        requestFrameSend();
+    }, 100); // 10 fps
+});
+
+document.getElementById('btnAnimRipple').addEventListener('click', () => {
+    stopAnimation();
+    animPhase = 0;
+    currentAnimation = setInterval(() => {
+        animPhase += 0.5;
+        const cx = GRID_SIZE / 2;
+        const cy = GRID_SIZE / 2;
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                const dist = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
+                const val = Math.sin(dist - animPhase) * 127 + 128;
+                grid[y][x] = { r: 0, g: Math.floor(val), b: Math.floor(val) };
+            }
+        }
+        drawGrid();
+        requestFrameSend();
+    }, 100);
+});
+
+document.getElementById('btnAnimMatrix').addEventListener('click', () => {
+    stopAnimation();
+    // Initialize empty grid with some random drops
+    let drops = Array.from({length: GRID_SIZE}, () => Math.floor(Math.random() * -GRID_SIZE));
+    
+    currentAnimation = setInterval(() => {
+        // Fade existing pixels
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                grid[y][x].g = Math.floor(grid[y][x].g * 0.7);
+            }
+        }
+        
+        // Move drops
+        for (let x = 0; x < GRID_SIZE; x++) {
+            const y = drops[x];
+            if (y >= 0 && y < GRID_SIZE) {
+                grid[y][x] = { r: 0, g: 255, b: 0 };
+            }
+            drops[x]++;
+            if (drops[x] > GRID_SIZE && Math.random() > 0.8) {
+                drops[x] = -1; // Reset to top
+            }
+        }
+        drawGrid();
+        requestFrameSend();
+    }, 100);
+});
+
+function hslToRgb(h, s, l) {
+    let r, g, b;
+    if (s === 0) {
+        r = g = b = l; 
+    } else {
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        const hNorm = h / 360;
+        r = hue2rgb(p, q, hNorm + 1/3);
+        g = hue2rgb(p, q, hNorm);
+        b = hue2rgb(p, q, hNorm - 1/3);
+    }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
 
 // UI states
 function setControlsDisabled(disabled) {
