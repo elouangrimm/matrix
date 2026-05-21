@@ -1,126 +1,115 @@
-import time
-import sys
-from machine import Pin
+import machine
 import neopixel
+import sys
+import select
+import time
+import micropython
 
-W = 16
-H = 16
-N = W * H
-DATA_PIN = 5
+# CRITICAL: Disable Ctrl+C so binary data doesn't crash the script back to REPL
+micropython.kbd_intr(-1)
 
-np = neopixel.NeoPixel(Pin(DATA_PIN, Pin.OUT), N)
+PIN_NUM = 5
+NUM_LEDS = 256
+pin = machine.Pin(PIN_NUM, machine.Pin.OUT)
+np = neopixel.NeoPixel(pin, NUM_LEDS)
 
-BRIGHTNESS = 32  # 0..255
-
-def _scale(r, g, b):
-    br = BRIGHTNESS
-    return (r * br // 255, g * br // 255, b * br // 255)
+# Divides brightness to prevent USB power resets on the C3 (8 = 12.5% brightness)
+BRIGHT_DIV = 8 
 
 def xy_to_i(x, y):
-    """
-    Editor coordinates: (0,0)=top-left, x->right, y->down.
-
-    Panel wiring observed: first LED bottom-left, serpentine rows, horizontal scan.
-    """
-    # Convert top-left origin to bottom-left origin
-    yy = (H - 1) - y
-    xx = x
-
-    if (yy & 1) == 0:
-        return yy * W + xx
-    return yy * W + (W - 1 - xx)
+    physical_row = 15 - y 
+    if physical_row % 2 == 0:
+        return (physical_row * 16) + x
+    else:
+        return (physical_row * 16) + (15 - x)
 
 def clear():
-    for i in range(N):
+    for i in range(NUM_LEDS):
         np[i] = (0, 0, 0)
     np.write()
 
-def test_corners():
+def test_pattern():
     clear()
-    np[xy_to_i(0, 0)] = _scale(255, 0, 0)           # top-left red
-    np[xy_to_i(W-1, 0)] = _scale(0, 255, 0)         # top-right green
-    np[xy_to_i(0, H-1)] = _scale(0, 0, 255)         # bottom-left blue
-    np[xy_to_i(W-1, H-1)] = _scale(255, 255, 255)   # bottom-right white
+    np[xy_to_i(0, 0)]   = (255//BRIGHT_DIV, 0, 0)
+    np[xy_to_i(15, 0)]  = (0, 255//BRIGHT_DIV, 0)
+    np[xy_to_i(0, 15)]  = (0, 0, 255//BRIGHT_DIV)
+    np[xy_to_i(15, 15)] = (255//BRIGHT_DIV, 255//BRIGHT_DIV, 255//BRIGHT_DIV)
     np.write()
 
-def show_frame(buf):
-    if len(buf) != W * H * 3:
-        return False
+poll = select.poll()
+poll.register(sys.stdin, select.POLLIN)
 
-    i = 0
-    for y in range(H):
-        for x in range(W):
-            r = buf[i]
-            g = buf[i + 1]
-            b = buf[i + 2]
-            np[xy_to_i(x, y)] = _scale(r, g, b)
-            i += 3
-
-    np.write()
-    return True
-
-def read_line():
-    # ASCII line reader, LF-terminated
-    line = bytearray()
-    while True:
-        c = sys.stdin.buffer.read(1)
-        if not c:
-            time.sleep_ms(1)
-            continue
-        if c == b"\n":
-            return bytes(line)
-        if c != b"\r":
-            line += c
-
-def read_exact(n):
+def read_exact(n, timeout_ms=1500):
     buf = bytearray(n)
-    mv = memoryview(buf)
     got = 0
+    start = time.ticks_ms()
     while got < n:
-        chunk = sys.stdin.buffer.read(n - got)
-        if not chunk:
-            time.sleep_ms(1)
-            continue
-        mv[got:got + len(chunk)] = chunk
-        got += len(chunk)
+        if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+            return None # Timed out!
+        if poll.poll(10):
+            # FIX: Read exactly 1 byte at a time. 
+            # Asking for more causes ESP32-C3 Native USB to permanently lock up!
+            c = sys.stdin.buffer.read(1)
+            if c:
+                buf[got] = c[0]
+                got += 1
     return buf
 
-def main():
-    clear()
-    test_corners()
-    sys.stdout.write("READY\n")
-
-    # Protocol:
-    #   ASCII: FRAME\n
-    #   then exactly 768 bytes (RGBRGB... row-major y=0..15 x=0..15)
-    #   then ASCII: \n (optional; we ignore one byte if present)
-    #
-    # Other commands: PING, CLEAR, TEST
+def run():
+    print("READY")
+    line_buf = bytearray()
+    
     while True:
-        cmd = read_line().strip().upper()
+        if poll.poll(10):
+            c_bytes = sys.stdin.buffer.read(1)
+            if not c_bytes:
+                continue
+                
+            c = c_bytes[0]
+            if c == 10: # '\n' newline
+                try:
+                    cmd = line_buf.decode('utf-8').strip()
+                except:
+                    cmd = ""
+                line_buf = bytearray()
+                
+                if cmd == "PING":
+                    print("READY")
+                elif cmd == "CLEAR":
+                    clear()
+                    print("OK")
+                elif cmd == "TEST":
+                    test_pattern()
+                    print("OK")
+                elif cmd == "FRAME":
+                    payload = read_exact(774, 1500)
+                    
+                    if payload is None:
+                        print("ERR: Timeout")
+                        continue
+                        
+                    if payload[0:4] == b'FRM1':
+                        length = payload[4] | (payload[5] << 8)
+                        if length == 768:
+                            idx = 6
+                            for y in range(16):
+                                for x in range(16):
+                                    np[xy_to_i(x, y)] = (payload[idx]//BRIGHT_DIV, payload[idx+1]//BRIGHT_DIV, payload[idx+2]//BRIGHT_DIV)
+                                    idx += 3
+                            np.write()
+                            print("OK")
+                        else:
+                            print("ERR: Len")
+                    else:
+                        print("ERR: Magic")
+            else:
+                line_buf.append(c)
+                # Auto-clear buffer if it gets full of garbage
+                if len(line_buf) > 128:
+                    line_buf = bytearray()
 
-        if cmd == b"PING":
-            sys.stdout.write("PONG\n")
-            continue
-
-        if cmd == b"CLEAR":
-            clear()
-            sys.stdout.write("OK\n")
-            continue
-
-        if cmd == b"TEST":
-            test_corners()
-            sys.stdout.write("OK\n")
-            continue
-
-        if cmd == b"FRAME":
-            frame = read_exact(W * H * 3)
-            show_frame(frame)
-            # swallow one trailing byte if sender adds '\n'
-            sys.stdin.buffer.read(1)
-            sys.stdout.write("OK\n")
-            continue
-
-        sys.stdout.write("ERR\n")
-
-main()
+try:
+    run()
+except Exception as e:
+    micropython.kbd_intr(3)
+    raise e
