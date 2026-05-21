@@ -67,6 +67,13 @@
                                 <button class="c-swatch" style="background-color: #ec4899;" data-c="#ec4899"></button>
                                 <button class="c-swatch" style="background-color: #ffffff;" data-c="#ffffff"></button>
                                 <button class="c-swatch" style="background-color: #000000; box-shadow: inset 0 0 0 1px #444;" data-c="#000000"></button>
+                                <!-- Recent colors space -->
+                                <button class="c-swatch recent-color" style="background-color: transparent; border: 1px dashed #444;" data-c=""></button>
+                                <button class="c-swatch recent-color" style="background-color: transparent; border: 1px dashed #444;" data-c=""></button>
+                                <button class="c-swatch recent-color" style="background-color: transparent; border: 1px dashed #444;" data-c=""></button>
+                                <button class="c-swatch recent-color" style="background-color: transparent; border: 1px dashed #444;" data-c=""></button>
+                                <button class="c-swatch recent-color" style="background-color: transparent; border: 1px dashed #444;" data-c=""></button>
+                                <button class="c-swatch recent-color" style="background-color: transparent; border: 1px dashed #444;" data-c=""></button>
                             </div>
                         </div>
                     </div>
@@ -95,10 +102,20 @@
                 <div class="panel">
                     <h3><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="animations">Animations</span></h3>
                     <div class="action-list">
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.2rem; display: block;">Speed</label>
+                        <input type="range" id="animSpeed" min="0.1" max="3" step="0.1" value="1" style="width:100%; margin-bottom: 0.5rem;">
                         <button id="btnAnimRainbow" class="btn btn-secondary action-btn">Rainbow Diagonal</button>
                         <button id="btnAnimRipple" class="btn btn-secondary action-btn">Ripple</button>
                         <button id="btnAnimMatrix" class="btn btn-secondary action-btn">Digital Rain</button>
                         <button id="btnAnimStop" class="btn btn-secondary action-btn" style="color:#ef4444; margin-top: 0.5rem;"><i class="fa-solid fa-stop"></i> Stop</button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3><i class="fa-solid fa-gear"></i> <span data-i18n="settings">Settings</span></h3>
+                    <div class="modifiers" style="margin-top: 0;">
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: -0.2rem; display: block;">Global Brightness</label>
+                        <input type="range" id="globalBrightness" min="0" max="1" step="0.05" value="1" style="width:100%">
                     </div>
                 </div>
 

@@ -39,6 +39,7 @@ const i18n = {
         'disconnect': 'Disconnect',
         'disconnected': 'Disconnected',
         'animations': 'Animations',
+        'settings': 'Settings',
         'tools': 'Drawing Tools',
         'examples': 'Examples',
         'util': 'Utilities',
@@ -55,6 +56,7 @@ const i18n = {
         'disconnect': 'Déconnecter',
         'disconnected': 'Déconnecté',
         'animations': 'Animations',
+        'settings': 'Paramètres',
         'tools': 'Outils de dessin',
         'examples': 'Exemples',
         'util': 'Utilitaires',
@@ -108,6 +110,7 @@ function loadImageToGrid(imgSource) {
         
         const imgData = octx.getImageData(0, 0, GRID_SIZE, GRID_SIZE).data;
 
+        saveState();
         let i = 0;
         for (let y = 0; y < GRID_SIZE; y++) {
             for (let x = 0; x < GRID_SIZE; x++) {
@@ -200,9 +203,30 @@ Object.keys(tools).forEach(toolName => {
 });
 
 // Quick Colors
+let recentColors = [];
+function updateRecentColors(hex) {
+    if (!hex) return;
+    hex = hex.toLowerCase();
+    recentColors = recentColors.filter(c => c !== hex);
+    recentColors.unshift(hex);
+    if (recentColors.length > 6) recentColors.pop();
+    
+    const uiSwatches = document.querySelectorAll('.recent-color');
+    uiSwatches.forEach((swatch, i) => {
+        if (recentColors[i]) {
+            swatch.style.backgroundColor = recentColors[i];
+            swatch.style.border = 'none';
+            swatch.setAttribute('data-c', recentColors[i]);
+            if (recentColors[i] === '#000000') swatch.style.boxShadow = 'inset 0 0 0 1px #444';
+            else swatch.style.boxShadow = 'none';
+        }
+    });
+}
+
 document.getElementById('quickColors').addEventListener('click', (e) => {
     if (e.target.classList.contains('c-swatch')) {
-        colorPicker.value = e.target.getAttribute('data-c');
+        const c = e.target.getAttribute('data-c');
+        if (c) colorPicker.value = c;
         if (currentTool === 'erase') {
             currentTool = 'draw';
             Object.values(tools).forEach(t => t.classList.remove('active'));
@@ -223,6 +247,25 @@ function hexToRgb(hex) {
 function colorsMatch(c1, c2) {
     return c1.r === c2.r && c1.g === c2.g && c1.b === c2.b;
 }
+
+const undoStack = [];
+function saveState() {
+    undoStack.push(JSON.stringify(grid));
+    if (undoStack.length > 20) undoStack.shift();
+}
+function undo() {
+    if (undoStack.length > 0) {
+        grid = JSON.parse(undoStack.pop());
+        drawGrid();
+        requestFrameSend();
+    }
+}
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo();
+    }
+});
 
 function floodFill(startX, startY, targetColor) {
     const startColor = grid[startY][startX];
@@ -291,15 +334,21 @@ function interactCanvas(event) {
 
         if (currentTool === 'fill' && !isRightClick) {
             if (event.type === 'mousedown') {
+                saveState();
                 floodFill(x, y, drawColor);
+                updateRecentColors(colorPicker.value);
                 drawGrid();
                 requestFrameSend();
             }
         } else {
             // Bresenham interpolation to prevent dotted lines on fast drag
             if (event.type === 'mousedown') {
+                saveState();
                 grid[y][x] = drawColor;
                 lastDrawPos = {x, y};
+                if (currentTool !== 'erase' && !isRightClick) {
+                    updateRecentColors(colorPicker.value);
+                }
             } else if (event.type === 'mousemove' && lastDrawPos) {
                 bresenhamDraw(lastDrawPos.x, lastDrawPos.y, x, y, drawColor);
                 lastDrawPos = {x, y};
@@ -336,6 +385,9 @@ canvas.addEventListener('mouseleave', () => { isDrawingMouse = false; lastDrawPo
 // Toggles triggers frame updates
 if (chkFlipX) chkFlipX.addEventListener('change', () => requestFrameSend());
 if (chkFlipY) chkFlipY.addEventListener('change', () => requestFrameSend());
+document.getElementById('globalBrightness').addEventListener('input', () => {
+    if (!currentAnimation) requestFrameSend();
+});
 
 // Import Image
 document.getElementById('imageInput').addEventListener('change', (e) => {
@@ -348,6 +400,7 @@ document.getElementById('imageInput').addEventListener('change', (e) => {
 // Action Buttons
 document.getElementById('btnClear').addEventListener('click', () => {
     stopAnimation();
+    saveState();
     grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill({ r: 0, g: 0, b: 0 }));
     drawGrid();
     sendTextCommand("CLEAR\n");
@@ -371,6 +424,7 @@ function stopAnimation() {
 
 document.getElementById('btnAnimStop').addEventListener('click', () => {
     stopAnimation();
+    saveState();
     grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill({ r: 0, g: 0, b: 0 }));
     drawGrid();
     requestFrameSend();
@@ -380,7 +434,8 @@ document.getElementById('btnAnimRainbow').addEventListener('click', () => {
     stopAnimation();
     animPhase = 0;
     currentAnimation = setInterval(() => {
-        animPhase -= 0.5; // speed
+        let speed = 0.5 * parseFloat(document.getElementById('animSpeed').value);
+        animPhase -= speed; // speed
         for (let y = 0; y < GRID_SIZE; y++) {
             for (let x = 0; x < GRID_SIZE; x++) {
                 const hue = ((x + y) * 10 + animPhase * 10) % 360;
@@ -397,7 +452,8 @@ document.getElementById('btnAnimRipple').addEventListener('click', () => {
     stopAnimation();
     animPhase = 0;
     currentAnimation = setInterval(() => {
-        animPhase += 0.5;
+        let speed = 0.5 * parseFloat(document.getElementById('animSpeed').value);
+        animPhase += speed;
         const cx = GRID_SIZE / 2;
         const cy = GRID_SIZE / 2;
         for (let y = 0; y < GRID_SIZE; y++) {
@@ -415,23 +471,24 @@ document.getElementById('btnAnimRipple').addEventListener('click', () => {
 document.getElementById('btnAnimMatrix').addEventListener('click', () => {
     stopAnimation();
     // Initialize empty grid with some random drops
-    let drops = Array.from({length: GRID_SIZE}, () => Math.floor(Math.random() * -GRID_SIZE));
+    let drops = Array.from({length: GRID_SIZE}, () => (Math.random() * -GRID_SIZE));
     
     currentAnimation = setInterval(() => {
+        let speed = 1 * parseFloat(document.getElementById('animSpeed').value);
         // Fade existing pixels
         for (let y = 0; y < GRID_SIZE; y++) {
             for (let x = 0; x < GRID_SIZE; x++) {
-                grid[y][x].g = Math.floor(grid[y][x].g * 0.7);
+                grid[y][x].g = Math.floor(grid[y][x].g * (0.85 - (0.15 * speed)));
             }
         }
         
         // Move drops
         for (let x = 0; x < GRID_SIZE; x++) {
-            const y = drops[x];
+            const y = Math.floor(drops[x]);
             if (y >= 0 && y < GRID_SIZE) {
                 grid[y][x] = { r: 0, g: 255, b: 0 };
             }
-            drops[x]++;
+            drops[x] += speed;
             if (drops[x] > GRID_SIZE && Math.random() > 0.8) {
                 drops[x] = -1; // Reset to top
             }
@@ -539,9 +596,10 @@ async function sendCurrentFrame() {
             let mapX = flipX ? (GRID_SIZE - 1 - x) : x;
             let mapY = flipY ? (GRID_SIZE - 1 - y) : y;
             let color = grid[mapY][mapX];
-            u8[offset++] = color.r;
-            u8[offset++] = color.g;
-            u8[offset++] = color.b;
+            let brightness = parseFloat(document.getElementById('globalBrightness').value) || 1.0;
+            u8[offset++] = (color.r * brightness) | 0;
+            u8[offset++] = (color.g * brightness) | 0;
+            u8[offset++] = (color.b * brightness) | 0;
         }
     }
 
